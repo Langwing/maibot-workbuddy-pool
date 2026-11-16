@@ -11,7 +11,7 @@
   "license": "MIT",
   "urls": {
     "repository": "https://github.com/dingminhua/dsh-connect-workbuddy",
-    "homepage": "https://github.com/beichen24a1/MaiBot-WorkBuddy"
+    "homepage": "https://github.com/Langwing/maibot-workbuddy-pool"
   },
   "host_application": {
     "min_version": "1.3.0",
