@@ -1,0 +1,989 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WorkBuddy 账号池</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg-card: #232833;
+    --bg-soft: #1c212a;
+    --bg-input: #191d24;
+    --line: #3a4150;
+    --text: #e5e7eb;
+    --muted: #9ca3af;
+    --accent: #34d399;
+    --accent-soft: #6ee7b7;
+    --warn: #fbbf24;
+    --danger: #f87171;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body.maibot-page {
+    margin: 0; padding: 16px 18px 48px;
+    font-family: system-ui, "Microsoft YaHei", "PingFang SC", sans-serif;
+    font-size: 13px; color: var(--text); background: transparent;
+  }
+  h1 { font-size: 19px; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+  h2 { font-size: 13px; margin: 0; color: var(--text); font-weight: 600; }
+  .sub { color: var(--muted); font-size: 12px; line-height: 1.6; }
+  .hero { margin-bottom: 12px; }
+  .hero .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .tag { border: 1px solid var(--line); border-radius: 12px; padding: 2px 9px;
+         font-size: 11px; color: var(--muted); background: var(--bg-soft); }
+  .tag.on { color: var(--accent-soft); border-color: #14532d; background: #12241c; }
+  .tag.off { color: var(--danger); border-color: #4c1d1d; background: #241414; }
+
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 14px;
+          overflow-x: auto; }
+  .tab { background: transparent; border: none; border-bottom: 2px solid transparent;
+         color: var(--muted); padding: 8px 12px; border-radius: 0; font-size: 12px; }
+  .tab:hover { color: var(--accent-soft); border-bottom-color: #2f4a3d; }
+  .tab.active { color: var(--accent-soft); border-bottom-color: var(--accent); font-weight: 600; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+           gap: 10px; margin-bottom: 14px; }
+  .stat { background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--radius);
+          padding: 12px 14px; }
+  .stat .k { color: var(--muted); font-size: 11px; margin-bottom: 6px; }
+  .stat .v { font-size: 18px; font-weight: 600; color: var(--text); overflow: hidden;
+             text-overflow: ellipsis; white-space: nowrap; }
+  .stat .v.small { font-size: 14px; }
+
+  .card { background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--radius);
+          padding: 14px 16px; margin-bottom: 12px; }
+  .card-head { display: flex; align-items: center; justify-content: space-between;
+               gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .card-head .left { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .card-head .hint { color: var(--muted); font-size: 11px; }
+
+  button { border: 1px solid var(--line); background: #2f3643; color: #d1d5db;
+           border-radius: 7px; padding: 4px 11px; font-size: 12px; cursor: pointer;
+           transition: border-color .15s, color .15s, background .15s; }
+  button:hover { border-color: var(--accent); color: var(--accent-soft); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #0f172a;
+                   font-weight: 600; }
+  button.primary:hover { background: var(--accent-soft); color: #0f172a; }
+  button.ghost { background: transparent; }
+  button.danger:hover { border-color: var(--danger); color: var(--danger); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button:disabled:hover { border-color: var(--line); color: #d1d5db; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 11px; font-weight: 500; color: var(--muted);
+       padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: 9px 8px; border-bottom: 1px solid #2c3340; font-size: 12px; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr.current td { background: #1d2a25; }
+  .name { font-weight: 600; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px;
+           border-radius: 10px; padding: 1px 8px; white-space: nowrap; }
+  .badge::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+  .badge.ok { color: var(--accent-soft); background: #12241c; }
+  .badge.warn { color: var(--warn); background: #2a2110; }
+  .badge.error { color: var(--danger); background: #2a1414; }
+  .badge.cooldown { color: var(--warn); background: #2a2110; }
+  .badge.auth_failed { color: var(--danger); background: #2a1414; }
+  .badge.disabled { color: var(--muted); background: #262b34; }
+  .tag-mini { font-size: 10px; color: var(--muted); border: 1px solid var(--line);
+              border-radius: 8px; padding: 0 6px; margin-left: 6px; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--muted); }
+  .ops { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+  .empty { color: var(--muted); font-size: 12px; padding: 18px 8px; text-align: center;
+           border: 1px dashed var(--line); border-radius: 8px; line-height: 1.8; }
+
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  textarea, input[type="text"] { width: 100%; background: var(--bg-input); color: var(--text);
+    border: 1px solid var(--line); border-radius: 7px; padding: 8px 9px; font-size: 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
+  input[type="text"]:focus, textarea:focus { outline: none; border-color: var(--accent); }
+  input.tiny { padding: 4px 6px; font-size: 11px; }
+  select { background: var(--bg-input); color: var(--text); border: 1px solid var(--line);
+           border-radius: 6px; padding: 3px 6px; font-size: 11px; }
+  select:focus { outline: none; border-color: var(--accent); }
+  input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer; }
+  .field { margin-bottom: 10px; }
+  .field label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 5px; }
+  .split { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 11px;
+           margin: 12px 0 8px; }
+  .split::before, .split::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .panel-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+
+  .result { margin-top: 10px; font-size: 12px; line-height: 1.7; color: var(--muted);
+            background: var(--bg-soft); border: 1px solid var(--line); border-radius: 8px;
+            padding: 9px 11px; display: none; }
+  .result.show { display: block; }
+  .result b { color: var(--text); }
+  .result .err { color: var(--danger); }
+
+  .login-box { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+  .login-box input { flex: 1; }
+  .login-state { margin-top: 10px; font-size: 12px; color: var(--muted); line-height: 1.7; }
+  .login-state.ok { color: var(--accent-soft); }
+  .login-state.err { color: var(--danger); }
+
+  .settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+              gap: 8px 18px; }
+  .setting { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0;
+             border-bottom: 1px dashed #2c3340; font-size: 12px; }
+  .setting:last-child { border-bottom: none; }
+  .setting .k { color: var(--muted); }
+  .setting .v { color: var(--text); text-align: right; word-break: break-all; }
+
+  .credit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+  .credit { border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px; background: var(--bg-soft); }
+  .credit .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .credit .total { font-size: 20px; font-weight: 700; color: var(--accent-soft); }
+  .credit .pkg { font-size: 11px; color: var(--muted); line-height: 1.7; margin-top: 6px; }
+
+  .plan { font-size: 12px; line-height: 1.8; color: var(--muted); }
+  .plan b { color: var(--text); }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+  .chip { font-size: 11px; border: 1px solid var(--line); border-radius: 10px; padding: 1px 8px;
+          color: var(--muted); background: var(--bg-soft); }
+  .chip.new { color: var(--accent-soft); border-color: #14532d; background: #12241c; }
+  .chip.off { color: var(--danger); border-color: #4c1d1d; background: #241414; }
+
+  .checks { display: flex; flex-direction: column; gap: 6px; }
+  .check { display: flex; align-items: center; gap: 10px; padding: 7px 10px;
+           border: 1px solid var(--line); border-radius: 8px; background: var(--bg-soft); }
+  .check .cname { min-width: 120px; font-weight: 600; }
+  .check .cdetail { color: var(--muted); font-size: 11px; word-break: break-all; }
+
+  .jobs { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+  .job { display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--muted);
+         border-bottom: 1px dashed #2c3340; padding: 4px 0; }
+  .job .jmodel { color: var(--text); min-width: 150px; font-family: ui-monospace, monospace; }
+  .job .jtext { flex: 1; word-break: break-all; }
+
+  #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+           background: #111827; border: 1px solid var(--line); border-radius: 8px;
+           padding: 8px 16px; font-size: 12px; opacity: 0; transition: opacity .2s;
+           pointer-events: none; z-index: 20; max-width: 80vw; }
+  #toast.show { opacity: .97; }
+  #toast.err { background: #7f1d1d; border-color: #991b1b; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body class="maibot-page">
+  <div class="hero">
+    <h1>WorkBuddy 账号池</h1>
+    <div class="sub">
+      多账号轮换与失败换号、模型目录与倍率、图片/思考开关、积分总览、诊断与模型同步。
+      凭据加密保存在插件数据目录；本页不含签到与福利/补偿领取。
+    </div>
+    <div class="tags" id="tags"></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="accounts">账号</button>
+    <button class="tab" data-tab="models">模型</button>
+    <button class="tab" data-tab="credits">积分</button>
+    <button class="tab" data-tab="diagnose">诊断</button>
+    <button class="tab" data-tab="settings">设置</button>
+  </div>
+
+  <!-- 账号 -->
+  <section id="tab-accounts">
+    <div class="stats" id="stats"></div>
+
+    <div class="card">
+      <div class="card-head">
+        <div class="left">
+          <h2>账号池</h2>
+          <span class="hint" id="pool-hint">只有可用的账号参与轮换</span>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button id="refresh">刷新</button>
+          <button id="open-import">导入账号</button>
+          <button id="open-login" class="primary">扫码登录</button>
+        </div>
+      </div>
+      <div id="accounts"></div>
+    </div>
+
+    <div class="card hidden" id="panel-import">
+      <div class="card-head">
+        <div class="left">
+          <h2>导入账号</h2>
+          <span class="hint">支持数组或 {"accounts": [...]} 包装；同账号重复导入会覆盖 token</span>
+        </div>
+        <button class="ghost" data-close="panel-import">关闭</button>
+      </div>
+      <div class="field">
+        <label>粘贴导出文件内容</label>
+        <textarea id="import-text" placeholder='[{"access_token":"...","refresh_token":"...","uid":"...","nickname":"...","domain":"www.workbuddy.cn","expiresAt":1760000000000,"refreshExpiresAt":1760000000000}]'></textarea>
+      </div>
+      <div class="split">或使用文件路径</div>
+      <div class="field">
+        <label>文件路径（相对路径按插件数据目录解析）</label>
+        <input type="text" id="import-path" placeholder="accounts-import.json">
+      </div>
+      <div class="panel-actions">
+        <button class="ghost" data-close="panel-import">取消</button>
+        <button class="primary" id="do-import">开始导入</button>
+      </div>
+      <div class="result" id="import-result"></div>
+    </div>
+
+    <div class="card hidden" id="panel-login">
+      <div class="card-head">
+        <div class="left">
+          <h2>扫码登录</h2>
+          <span class="hint">在浏览器完成 WorkBuddy 授权，成功后自动加入账号池</span>
+        </div>
+        <button class="ghost" data-close="panel-login">关闭</button>
+      </div>
+      <div class="login-state" id="login-state">点击「生成授权链接」开始。</div>
+      <div class="login-box hidden" id="login-link-box">
+        <input type="text" id="login-link" readonly>
+        <button id="copy-link">复制</button>
+        <button class="primary" id="open-link">打开</button>
+      </div>
+      <div class="panel-actions">
+        <button class="primary" id="login-begin">生成授权链接</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 模型 -->
+  <section id="tab-models" class="hidden">
+    <div class="card">
+      <div class="card-head">
+        <div class="left">
+          <h2>模型目录</h2>
+          <span class="hint" id="catalog-hint">—</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button id="catalog-refresh">刷新目录</button>
+          <button id="batch-test">批量测试</button>
+          <button id="sync-apply" class="primary">同步模型</button>
+        </div>
+      </div>
+      <div id="models"></div>
+      <div class="jobs" id="jobs"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div class="left">
+          <h2>同步到 model_config.toml</h2>
+          <span class="hint">只对齐本插件 provider 名下的模型（新增/更新视觉/移除）；其他提供商不动；写前自动备份</span>
+        </div>
+      </div>
+      <div class="plan" id="sync-plan">—</div>
+      <div class="result" id="sync-result"></div>
+    </div>
+  </section>
+
+  <!-- 积分 -->
+  <section id="tab-credits" class="hidden">
+    <div class="card">
+      <div class="card-head">
+        <div class="left">
+          <h2>积分总览</h2>
+          <span class="hint" id="credits-hint">只读查询，不签到、不领取</span>
+        </div>
+        <button id="credits-fetch" class="primary">读取积分</button>
+      </div>
+      <div class="credit-grid" id="credits"></div>
+    </div>
+  </section>
+
+  <!-- 诊断 -->
+  <section id="tab-diagnose" class="hidden">
+    <div class="card">
+      <div class="card-head">
+        <div class="left">
+          <h2>诊断</h2>
+          <span class="hint">检查账号池、本地模型服务、目录缓存与 model_config 对齐情况</span>
+        </div>
+        <button id="diagnose-run" class="primary">重新诊断</button>
+      </div>
+      <div class="checks" id="checks"></div>
+    </div>
+  </section>
+
+  <!-- 设置 -->
+  <section id="tab-settings" class="hidden">
+    <div class="card">
+      <div class="card-head">
+        <div class="left">
+          <h2>运行配置</h2>
+          <span class="hint">在「插件 → WorkBuddy 账号池接入」中修改</span>
+        </div>
+      </div>
+      <div class="settings" id="settings"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div class="left">
+          <h2>设备身份</h2>
+          <span class="hint">按账号稳定派生；留空恢复派生值，保存后立即生效</span>
+        </div>
+        <button id="identity-reset" class="danger">重置盐</button>
+      </div>
+      <div id="identity"></div>
+    </div>
+  </section>
+
+  <div id="toast"></div>
+
+<script>
+  const $ = (s) => document.querySelector(s);
+  const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  let STATE = null;
+  let MODELS = null;
+  let CREDITS = null;
+  let IDENTITY = null;
+  let pollTimer = null;
+  let jobTimer = null;
+
+  function toast(msg, err) {
+    const el = $("#toast");
+    el.textContent = msg;
+    el.className = "show" + (err ? " err" : "");
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.className = ""; }, 2600);
+  }
+
+  function fail(e) {
+    const msg = (e && (e.message || e.detail || e.error)) || String(e);
+    toast(msg, true);
+  }
+
+  function fmtExpiry(ms) {
+    if (!ms) return "—";
+    const left = ms - Date.now();
+    if (left <= 0) return "已过期（将自动刷新）";
+    const days = Math.floor(left / 86400000);
+    const hours = Math.floor((left % 86400000) / 3600000);
+    if (days > 0) return days + " 天 " + hours + " 小时后";
+    return Math.max(1, Math.floor(left / 60000)) + " 分钟后";
+  }
+
+  function fmtTime(sec) {
+    if (!sec) return "—";
+    const d = new Date(sec * 1000);
+    return d.toLocaleString();
+  }
+
+  function fmtNum(v) {
+    if (v == null || isNaN(v)) return "—";
+    return Number(v).toFixed(2).replace(/\.00$/, "");
+  }
+
+  // ---------------------------------------------------------------- 标签页
+  document.querySelectorAll(".tab").forEach((btn) => {
+    btn.onclick = () => {
+      document.querySelectorAll(".tab").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      ["accounts", "models", "credits", "diagnose", "settings"].forEach((name) => {
+        $("#tab-" + name).classList.toggle("hidden", name !== btn.dataset.tab);
+      });
+      const tab = btn.dataset.tab;
+      if (tab === "models") loadModels();
+      if (tab === "credits") loadCredits();
+      if (tab === "diagnose") loadDiagnose();
+      if (tab === "settings") loadSettings();
+    };
+  });
+
+  // ---------------------------------------------------------------- 账号
+  function renderTags() {
+    const s = STATE || {};
+    const on = !!s.enabled;
+    const m = (MODELS && MODELS.catalog) || {};
+    const server = m.server || {};
+    $("#tags").innerHTML =
+      '<span class="tag ' + (on ? "on" : "off") + '">' + (on ? "插件已启用" : "插件已停用") + "</span>" +
+      '<span class="tag ' + (s.ready ? "on" : "off") + '">' + (s.ready ? "账号池已就绪" : "账号池未初始化") + "</span>" +
+      '<span class="tag">共 ' + ((s.counts && s.counts.total) || 0) + " 个账号</span>" +
+      '<span class="tag ' + (server.running ? "on" : "off") + '">' +
+        (server.running ? "模型服务 " + esc(server.port) : "模型服务未启动") + "</span>";
+  }
+
+  function renderStats() {
+    const s = STATE || {};
+    const active = s.active || "—";
+    const model = (s.settings && s.settings.default_model) || "—";
+    const catalogCount = (MODELS && MODELS.catalog && MODELS.catalog.count) || 0;
+    $("#stats").innerHTML = [
+      ["账号总数", ((s.counts && s.counts.total) || 0), false],
+      ["当前可用", ((s.counts && s.counts.usable) || 0), false],
+      ["当前账号", active, true],
+      ["默认模型", model, true],
+      ["目录模型数", catalogCount, false],
+    ].map(([k, v, small]) =>
+      '<div class="stat"><div class="k">' + esc(k) + '</div><div class="v' +
+      (small ? " small" : "") + '" title="' + esc(v) + '">' + esc(v) + "</div></div>").join("");
+  }
+
+  function accountRow(a) {
+    return '<tr class="' + (a.active ? "current" : "") + '">' +
+      '<td><span class="name">' + esc(a.nickname) + "</span>" +
+        (a.active ? '<span class="tag-mini">当前使用</span>' : "") +
+        (a.disabled ? '<span class="tag-mini">已停用</span>' : "") + "</td>" +
+      '<td>' + esc(a.realm_text) + "</td>" +
+      '<td class="mono">' + esc(a.uid_masked) + "</td>" +
+      '<td><span class="badge ' + esc(a.state) + '">' + esc(a.state_text) + "</span></td>" +
+      '<td class="mono">' + esc(fmtExpiry(a.expires_at)) + "</td>" +
+      '<td><div class="ops">' +
+        '<button data-act="switch" data-ref="' + esc(a.ref) + '"' + (a.active ? " disabled" : "") + ">设为当前</button>" +
+        '<button data-act="refresh-token" data-ref="' + esc(a.ref) + '">刷新 token</button>' +
+        '<button data-act="toggle" data-ref="' + esc(a.ref) + '">' + (a.disabled ? "启用" : "停用") + "</button>" +
+        '<button data-act="remove" data-ref="' + esc(a.ref) + '" class="danger">移除</button>' +
+      "</div></td></tr>";
+  }
+
+  function renderAccounts() {
+    const list = (STATE && STATE.accounts) || [];
+    const hint = $("#pool-hint");
+    if (!list.length) {
+      hint.textContent = "只有可用的账号参与轮换";
+      $("#accounts").innerHTML = '<div class="empty">账号池为空。<br>' +
+        "点击「导入账号」粘贴 dsh-connect-workbuddy 的导出 JSON，或使用「扫码登录」新增账号。</div>";
+      return;
+    }
+    hint.textContent = "失败换号按此顺序：当前账号优先，其余最久未用优先";
+    $("#accounts").innerHTML =
+      "<table><thead><tr><th>账号</th><th>区域</th><th>uid</th><th>状态</th>" +
+      "<th>Token 到期</th><th style=\"text-align:right\">操作</th></tr></thead><tbody>" +
+      list.map(accountRow).join("") + "</tbody></table>";
+  }
+
+  function renderSettings() {
+    const s = STATE || {};
+    const cfg = s.settings || {};
+    const rows = [
+      ["默认模型", cfg.default_model],
+      ["失败换号", "最多 " + cfg.max_attempts + " 个账号"],
+      ["冷却时间", cfg.cooldown_seconds + " 秒"],
+      ["并发 / RPM", cfg.concurrency + " / " + (cfg.rpm || "不限")],
+      ["国内网关", cfg.cn_chat_base],
+      ["国际网关", cfg.global_chat_base],
+      ["默认导入文件", cfg.import_path],
+    ];
+    $("#settings").innerHTML = rows.map(([k, v]) =>
+      '<div class="setting"><span class="k">' + esc(k) + '</span><span class="v">' +
+      esc(v) + "</span></div>").join("");
+  }
+
+  async function refresh() {
+    try {
+      STATE = await maibot.query("state");
+      renderTags();
+      renderStats();
+      renderAccounts();
+      renderSettings();
+    } catch (e) { fail(e); }
+  }
+
+  $("#refresh").onclick = refresh;
+
+  document.querySelectorAll("[data-close]").forEach((btn) => {
+    btn.onclick = () => $("#" + btn.dataset.close).classList.add("hidden");
+  });
+  $("#open-import").onclick = () => $("#panel-import").classList.remove("hidden");
+  $("#open-login").onclick = () => $("#panel-login").classList.remove("hidden");
+
+  $("#accounts").addEventListener("click", async (ev) => {
+    const btn = ev.target.closest("button[data-act]");
+    if (!btn) return;
+    const ref = btn.dataset.ref;
+    btn.disabled = true;
+    try {
+      if (btn.dataset.act === "switch") {
+        const r = await maibot.action("switch", { ref });
+        if (r && r.error) throw new Error(r.error);
+        toast("已切换为：" + r.active);
+      } else if (btn.dataset.act === "remove") {
+        const r = await maibot.action("remove", { ref });
+        if (r && r.error) throw new Error(r.error);
+        toast("已移除：" + r.removed);
+      } else if (btn.dataset.act === "refresh-token") {
+        const r = await maibot.action("account_refresh", { ref });
+        if (r && r.error) throw new Error(r.error);
+        toast("token 已刷新");
+      } else if (btn.dataset.act === "toggle") {
+        const r = await maibot.action("account_toggle", { ref });
+        if (r && r.error) throw new Error(r.error);
+        toast(r.disabled ? "账号已停用" : "账号已启用");
+      }
+      await refresh();
+    } catch (e) {
+      fail(e);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  $("#do-import").onclick = async () => {
+    const payload = $("#import-text").value.trim();
+    const path = $("#import-path").value.trim();
+    const box = $("#import-result");
+    if (!payload && !path) { toast("请粘贴 JSON 或填写文件路径", true); return; }
+    const btn = $("#do-import");
+    btn.disabled = true;
+    box.className = "result";
+    try {
+      const r = await maibot.action("import", { payload, path });
+      if (r && r.error) throw new Error(r.error);
+      const skipped = (r.skipped || []);
+      box.innerHTML =
+        "来源：<b>" + esc(r.source) + "</b><br>" +
+        "文件共 <b>" + r.total + "</b> 条，新增 <b>" + r.added +
+        "</b>，更新 <b>" + r.updated + "</b>，跳过 <b>" + r.skipped_total + "</b>" +
+        (skipped.length ? '<br><span class="err">' + skipped.map(esc).join("<br>") + "</span>" : "");
+      box.classList.add("show");
+      toast("导入完成：新增 " + r.added + "，更新 " + r.updated);
+      $("#import-text").value = "";
+      await refresh();
+    } catch (e) {
+      box.innerHTML = '<span class="err">' + esc(e.message || e) + "</span>";
+      box.classList.add("show");
+      fail(e);
+    } finally {
+      btn.disabled = false;
+    }
+  };
+
+  async function pollLogin() {
+    clearInterval(pollTimer);
+    pollTimer = setInterval(async () => {
+      try {
+        const s = await maibot.query("login_status");
+        if (s.status === "pending") {
+          $("#login-state").className = "login-state";
+          $("#login-state").textContent = "等待授权中……请在新窗口完成登录，最多等待 10 分钟。";
+        } else if (s.status === "success") {
+          clearInterval(pollTimer);
+          $("#login-state").className = "login-state ok";
+          $("#login-state").textContent = "登录成功，已加入账号池：" + (s.label || "");
+          $("#login-link-box").classList.add("hidden");
+          toast("登录成功：" + (s.label || ""));
+          await refresh();
+        } else if (s.status === "error") {
+          clearInterval(pollTimer);
+          $("#login-state").className = "login-state err";
+          $("#login-state").textContent = "登录失败：" + (s.error || "未知错误");
+        }
+      } catch (e) {
+        clearInterval(pollTimer);
+        fail(e);
+      }
+    }, 1500);
+  }
+
+  $("#login-begin").onclick = async () => {
+    const btn = $("#login-begin");
+    btn.disabled = true;
+    try {
+      const r = await maibot.action("login_begin", {});
+      if (r && r.error) throw new Error(r.error);
+      $("#login-link").value = r.url || "";
+      $("#login-link-box").classList.remove("hidden");
+      $("#login-state").className = "login-state";
+      $("#login-state").textContent = "已生成授权链接，请复制到浏览器打开并完成登录。";
+      pollLogin();
+    } catch (e) {
+      fail(e);
+    } finally {
+      btn.disabled = false;
+    }
+  };
+
+  $("#copy-link").onclick = async () => {
+    const value = $("#login-link").value;
+    try {
+      await navigator.clipboard.writeText(value);
+      toast("授权链接已复制");
+    } catch (e) {
+      $("#login-link").select();
+      toast("请手动复制（Ctrl+C）", true);
+    }
+  };
+
+  $("#open-link").onclick = () => {
+    const url = $("#login-link").value;
+    if (url) window.open(url, "_blank", "noopener");
+  };
+
+  // ---------------------------------------------------------------- 模型
+  function renderModels() {
+    const data = MODELS || {};
+    const catalog = data.catalog || {};
+    const server = catalog.server || {};
+    $("#catalog-hint").textContent =
+      "共 " + (catalog.count || 0) + " 个模型 · 更新于 " + (catalog.updated_text || "未知") +
+      (server.running ? " · " + server.base_url : " · 服务未启动");
+
+    const list = data.models || [];
+    const levels = data.reasoning_levels || ["off", "low", "medium", "high", "xhigh", "max"];
+    if (!list.length) {
+      $("#models").innerHTML = '<div class="empty">还没有目录。点击「刷新目录」从 WorkBuddy 读取。</div>';
+      return;
+    }
+    const rows = list.map((m) => {
+      const opts = ['<option value="">默认' + (m.default_reasoning ? "（" + esc(m.default_reasoning) + "）" : "") + '</option>'].concat(
+        levels.map((lv) => '<option value="' + lv + '"' + (m.reasoning === lv ? " selected" : "") + ">" +
+          (lv === "off" ? "关闭思考" : lv) + "</option>")
+      ).join("");
+      const promos = (m.promos || []).map((p) => p.name || p.title || p.label || p.kind)
+        .filter(Boolean).map((t) => '<span class="chip">' + esc(t) + "</span>").join("");
+      const k = (v) => (v ? Math.round(v / 1000) + "k" : "—");
+      return "<tr>" +
+        '<td><span class="name">' + esc(m.name) + '</span><span class="tag-mini">' + esc(m.id) + "</span>" +
+          (promos ? '<div class="chips">' + promos + "</div>" : "") + "</td>" +
+        '<td class="mono">' + k(m.context_window) + "</td>" +
+        '<td class="mono">' + k(m.max_tokens) + "</td>" +
+        '<td class="mono">' + (m.credit_multiplier != null ? "x" + m.credit_multiplier : "—") + "</td>" +
+        '<td><input type="checkbox" data-visual="' + esc(m.id) + '"' + (m.visual ? " checked" : "") +
+          ' title="手动勾选：该模型是否支持图片输入（上游字段不可靠，不参与判断）"></td>' +
+        '<td><select data-reasoning="' + esc(m.id) + '">' + opts + "</select></td>" +
+        '<td><div class="ops"><button data-test="' + esc(m.id) + '">测试</button></div></td>' +
+        "</tr>";
+    }).join("");
+    $("#models").innerHTML =
+      "<table><thead><tr><th>模型</th><th>上下文</th><th>最大输出</th><th>倍率</th><th>图片</th>" +
+      "<th>思考</th><th style=\"text-align:right\">操作</th></tr></thead><tbody>" + rows + "</tbody></table>";
+
+    renderSyncPlan(data.sync || {});
+  }
+
+  function renderSyncPlan(plan) {
+    const box = $("#sync-plan");
+    if (plan.error) {
+      box.innerHTML = '<span class="err">' + esc(plan.error) + "</span>";
+      return;
+    }
+    const patches = plan.provider_patch || [];
+    const toAdd = plan.to_add || [];
+    const toUpdate = plan.to_update || [];
+    const toRemove = plan.to_remove || [];
+    const patchText = patches.length
+      ? patches.map((p) => ({ base_url: "base_url → 本地服务", model_list_endpoint: "model_list_endpoint → /models",
+          client_type: "client_type → local.workbuddy-pool", create_provider: "新建 WorkBuddy 提供商" }[p] || p)).join("、")
+      : "已对齐";
+    const chips = (list, cls, label) => list.length
+      ? '<div class="chips">' + list.slice(0, 40).map((m) =>
+          '<span class="chip ' + cls + '">' + esc(m.id) + (label ? " · " + esc(label) : "") + "</span>").join("") +
+        (list.length > 40 ? '<span class="chip">…</span>' : "") + "</div>"
+      : "";
+    box.innerHTML =
+      "配置文件：<b>" + esc(plan.path) + "</b><br>" +
+      "待新增 <b>" + (plan.add_count || 0) + "</b> · 待更新视觉 <b>" + (plan.update_count || 0) +
+      "</b> · 待移除 <b>" + (plan.remove_count || 0) + "</b> · 已有 <b>" + (plan.existing_count || 0) + "</b><br>" +
+      "提供商字段：" + esc(patchText) +
+      (plan.skipped_remove_count ? '<br><span style="color:var(--warn)">目录抓取不完整，本次跳过 ' +
+        esc(plan.skipped_remove_count) + " 个待移除模型</span>" : "") +
+      chips(toAdd, "new", "") +
+      chips(toUpdate, "", "视觉 " + (toUpdate.length ? (toUpdate[0].current_visual ? "开→关" : "关→开") : "")) +
+      chips(toRemove, "off", "移除");
+  }
+
+  async function savePrefs() {
+    const visual = Array.from(document.querySelectorAll("[data-visual]"))
+      .filter((el) => el.checked).map((el) => el.dataset.visual);
+    const reasoning = {};
+    document.querySelectorAll("[data-reasoning]").forEach((el) => {
+      if (el.value) reasoning[el.dataset.reasoning] = el.value;
+    });
+    try {
+      const r = await maibot.action("set_model_prefs", { visual, reasoning: JSON.stringify(reasoning) });
+      if (r && r.error) throw new Error(r.error);
+      toast("模型开关已保存");
+    } catch (e) {
+      fail(e);
+    }
+  }
+
+  async function loadModels() {
+    try {
+      MODELS = await maibot.query("models");
+      renderModels();
+      renderTags();
+      await loadJobs();
+    } catch (e) { fail(e); }
+  }
+
+  $("#models").addEventListener("change", (ev) => {
+    if (ev.target.matches("[data-visual],[data-reasoning]")) savePrefs();
+  });
+
+  $("#models").addEventListener("click", async (ev) => {
+    const btn = ev.target.closest("button[data-test]");
+    if (!btn) return;
+    btn.disabled = true;
+    try {
+      const r = await maibot.action("start_test", { model: btn.dataset.test });
+      if (r && r.error) throw new Error(r.error);
+      toast("已开始测试：" + btn.dataset.test);
+      startJobPolling();
+    } catch (e) {
+      fail(e);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  $("#catalog-refresh").onclick = async () => {
+    const btn = $("#catalog-refresh");
+    btn.disabled = true;
+    try {
+      const r = await maibot.action("refresh_catalog", {});
+      if (r && r.error) throw new Error(r.error);
+      toast(r.pending ? "目录刷新较慢，已在后台继续" : "目录已刷新");
+      await loadModels();
+      await refresh();
+    } catch (e) {
+      fail(e);
+    } finally {
+      btn.disabled = false;
+    }
+  };
+
+  $("#batch-test").onclick = async () => {
+    const ids = Array.from(document.querySelectorAll("[data-visual]")).map((el) => el.dataset.visual);
+    if (!ids.length) { toast("目录为空", true); return; }
+    const btn = $("#batch-test");
+    btn.disabled = true;
+    try {
+      const r = await maibot.action("start_batch_test", { models: ids.slice(0, 20) });
+      if (r && r.error) throw new Error(r.error);
+      toast("已开始批量测试 " + ids.slice(0, 20).length + " 个模型");
+      startJobPolling();
+    } catch (e) {
+      fail(e);
+    } finally {
+      btn.disabled = false;
+    }
+  };
+
+  $("#sync-apply").onclick = async () => {
+    const btn = $("#sync-apply");
+    btn.disabled = true;
+    try {
+      const r = await maibot.action("sync_apply", {});
+      if (r && r.error) throw new Error(r.error);
+      const box = $("#sync-result");
+      box.innerHTML = r.changed
+        ? "新增 <b>" + (r.add_count || 0) + "</b> 个 · 更新视觉 <b>" + (r.update_count || 0) +
+          "</b> 个 · 移除 <b>" + (r.remove_count || 0) + "</b> 个；备份：<b>" + esc(r.backup || "无") + "</b>"
+        : "无需改动：WorkBuddy 名下的模型已与目录一致。";
+      box.classList.add("show");
+      toast(r.changed ? "同步完成" : "已是最新");
+      await loadModels();
+    } catch (e) {
+      fail(e);
+    } finally {
+      btn.disabled = false;
+    }
+  };
+
+  function renderJobs(jobs) {
+    const box = $("#jobs");
+    if (!jobs || !jobs.length) { box.innerHTML = ""; return; }
+    const order = { running: 0, ok: 1, fail: 2 };
+    const sorted = jobs.slice().sort((a, b) => (order[a.status] - order[b.status]) || (b.started_at - a.started_at));
+    box.innerHTML = sorted.slice(0, 12).map((j) =>
+      '<div class="job"><span class="badge ' + (j.status === "ok" ? "ok" : j.status === "fail" ? "error" : "warn") +
+      '">' + (j.status === "running" ? "测试中" : j.status === "ok" ? "通过" : "失败") + "</span>" +
+      '<span class="jmodel">' + esc(j.model) + "</span>" +
+      '<span class="jtext">' + esc(j.status === "fail" ? j.error : j.text) + "</span>" +
+      '<span class="mono">' + (j.latency_ms ? j.latency_ms + "ms" : "") + "</span></div>").join("");
+  }
+
+  async function loadJobs() {
+    try {
+      const data = await maibot.query("tests");
+      renderJobs(data.jobs || []);
+      const running = (data.jobs || []).some((j) => j.status === "running");
+      if (running) startJobPolling();
+    } catch (e) { /* 忽略轮询错误 */ }
+  }
+
+  function startJobPolling() {
+    clearInterval(jobTimer);
+    jobTimer = setInterval(async () => {
+      try {
+        const data = await maibot.query("tests");
+        renderJobs(data.jobs || []);
+        if (!(data.jobs || []).some((j) => j.status === "running")) clearInterval(jobTimer);
+      } catch (e) {
+        clearInterval(jobTimer);
+      }
+    }, 2000);
+  }
+
+  // ---------------------------------------------------------------- 积分
+  function renderCredits() {
+    const data = CREDITS || {};
+    const items = data.items || [];
+    $("#credits-hint").textContent = data.updated_at
+      ? "最近读取：" + fmtTime(data.updated_at) + "（只读查询）"
+      : "只读查询，不签到、不领取";
+    if (!items.length) {
+      $("#credits").innerHTML = '<div class="empty">点击「读取积分」查询各账号余额。</div>';
+      return;
+    }
+    $("#credits").innerHTML = items.map((item) => {
+      if (!item.ok) {
+        return '<div class="credit"><div class="top"><span class="name">' + esc(item.nickname) + "</span>" +
+          '<span class="badge error">读取失败</span></div>' +
+          '<div class="pkg">' + esc(item.error || "未知错误") + "</div></div>";
+      }
+      const pkgs = (item.packages || []).map((p) =>
+        esc(p.name) + " · 剩余 " + fmtNum(p.remain) + " / " + fmtNum(p.size) +
+        (p.monthly ? "（每月刷新）" : (p.expires_at ? "（" + fmtTime(p.expires_at / 1000) + " 到期）" : ""))
+      ).join("<br>");
+      return '<div class="credit"><div class="top"><span class="name">' + esc(item.nickname) + "</span>" +
+        '<span class="total">' + fmtNum(item.total) + "</span></div>" +
+        '<div class="pkg">' + (pkgs || "没有可用积分包") +
+        (item.expiring_soon ? '<br><span style="color:var(--warn)">3 天内到期：' + fmtNum(item.expiring_soon) + "</span>" : "") +
+        "</div></div>";
+    }).join("");
+  }
+
+  async function loadCredits() {
+    try {
+      CREDITS = await maibot.query("credits");
+      renderCredits();
+    } catch (e) { fail(e); }
+  }
+
+  $("#credits-fetch").onclick = async () => {
+    const btn = $("#credits-fetch");
+    btn.disabled = true;
+    try {
+      const r = await maibot.action("fetch_credits", {});
+      if (r && r.error) throw new Error(r.error);
+      CREDITS = { items: r.items || [], updated_at: r.updated_at };
+      renderCredits();
+      toast("积分已更新");
+    } catch (e) {
+      fail(e);
+    } finally {
+      btn.disabled = false;
+    }
+  };
+
+  // ---------------------------------------------------------------- 诊断
+  function renderDiagnose(data) {
+    const checks = (data && data.checks) || [];
+    if (!checks.length) {
+      $("#checks").innerHTML = '<div class="empty">点击「重新诊断」检查当前状态。</div>';
+      return;
+    }
+    $("#checks").innerHTML = checks.map((c) =>
+      '<div class="check"><span class="badge ' + esc(c.status) + '">' +
+      (c.status === "ok" ? "正常" : c.status === "warn" ? "注意" : "异常") + "</span>" +
+      '<span class="cname">' + esc(c.name) + "</span>" +
+      '<span class="cdetail">' + esc(c.detail) + "</span></div>").join("");
+  }
+
+  async function loadDiagnose() {
+    try {
+      renderDiagnose(await maibot.query("diagnose"));
+    } catch (e) { fail(e); }
+  }
+
+  $("#diagnose-run").onclick = async () => {
+    const btn = $("#diagnose-run");
+    btn.disabled = true;
+    try {
+      renderDiagnose(await maibot.query("diagnose"));
+      toast("诊断完成");
+    } catch (e) {
+      fail(e);
+    } finally {
+      btn.disabled = false;
+    }
+  };
+
+  // ---------------------------------------------------------------- 设置
+  function renderIdentity(data) {
+    const list = (data && data.accounts) || [];
+    if (!list.length) {
+      $("#identity").innerHTML = '<div class="empty">账号池为空。</div>';
+      return;
+    }
+    $("#identity").innerHTML =
+      "<table><thead><tr><th>账号</th><th>X-Machine-ID</th><th>X-Session-ID</th><th style=\"text-align:right\">操作</th></tr></thead><tbody>" +
+      list.map((a) =>
+        "<tr>" +
+        '<td><span class="name">' + esc(a.nickname) + "</span>" +
+          (a.overridden ? '<span class="tag-mini">已覆盖</span>' : '<span class="tag-mini">派生</span>') + "</td>" +
+        '<td><input class="tiny" type="text" data-machine="' + esc(a.id) + '" value="' + esc(a.machine_id) + '" placeholder="留空=派生"></td>' +
+        '<td><input class="tiny" type="text" data-session="' + esc(a.id) + '" value="' + esc(a.session_id) + '" placeholder="留空=派生"></td>' +
+        '<td><div class="ops"><button data-ident-save="' + esc(a.id) + '">保存</button></div></td>' +
+        "</tr>").join("") + "</tbody></table>";
+  }
+
+  async function loadSettings() {
+    try {
+      STATE = await maibot.query("state");
+      IDENTITY = await maibot.query("identity");
+      renderSettings();
+      renderIdentity(IDENTITY);
+    } catch (e) { fail(e); }
+  }
+
+  $("#identity").addEventListener("click", async (ev) => {
+    const btn = ev.target.closest("button[data-ident-save]");
+    if (!btn) return;
+    const ref = btn.dataset.identSave;
+    const machine = document.querySelector('[data-machine="' + ref + '"]').value.trim();
+    const session = document.querySelector('[data-session="' + ref + '"]').value.trim();
+    btn.disabled = true;
+    try {
+      const r = await maibot.action("identity_set", { ref, machine_id: machine, session_id: session });
+      if (r && r.error) throw new Error(r.error);
+      renderIdentity(r);
+      toast("设备身份已保存");
+    } catch (e) {
+      fail(e);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  $("#identity-reset").onclick = async () => {
+    try {
+      const r = await maibot.action("identity_reset", {});
+      if (r && r.error) throw new Error(r.error);
+      renderIdentity(r);
+      toast("设备盐已重置");
+    } catch (e) {
+      fail(e);
+    }
+  };
+
+  // ---------------------------------------------------------------- 初始化
+  (async () => {
+    await refresh();
+    try { MODELS = await maibot.query("models"); } catch (e) { /* 目录未就绪 */ }
+    if (MODELS) renderModels();
+    const login = (STATE && STATE.login) || {};
+    if (login.status === "pending") {
+      $("#panel-login").classList.remove("hidden");
+      $("#login-link").value = login.url || "";
+      $("#login-link-box").classList.remove("hidden");
+      $("#login-state").textContent = "等待授权中……";
+      pollLogin();
+    } else if (login.status === "success") {
+      $("#login-state").className = "login-state ok";
+      $("#login-state").textContent = "最近一次登录成功：" + (login.label || "");
+    } else if (login.status === "error") {
+      $("#login-state").className = "login-state err";
+      $("#login-state").textContent = "最近一次登录失败：" + (login.error || "");
+    }
+  })();
+</script>
+</body>
+</html>

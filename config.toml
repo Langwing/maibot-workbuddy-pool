@@ -1,0 +1,83 @@
+# WorkBuddy 账号池接入（local.workbuddy-pool）配置文件
+# 修改后会自动热重载；也可在 WebUI「插件 → WorkBuddy 账号池接入」里编辑。
+# 各字段的校验范围见 plugin.py 中的 PluginConfigBase 定义。
+
+[plugin]
+# 是否启用 Provider。关闭后所有走 local.workbuddy-pool 的模型请求会直接报错。
+enabled = true
+# 配置版本，插件升级做配置迁移时使用，不要随意改动。
+config_version = "1.0.0"
+
+
+[pool]
+# 请求未指定模型时使用的 WorkBuddy 模型 ID，例如 deepseek-v4.1-flash。
+# 具体可用 ID 以你账号在 WorkBuddy 侧显示的为准；换模型改这里或模型的 model_identifier。
+# 不建议用 auto：可能被路由到思考模型，max_tokens 小时正文会被推理内容占满。
+default_model = "deepseek-v4.1-flash"
+
+# 一次调用最多尝试几个账号（含当前账号），用于 401/429/5xx 时自动换号。
+# 实际取值不会超过账号池里的可用账号数。范围 1-8。
+max_attempts = 3
+
+# 账号失败后的冷却秒数。429 优先使用上游 Retry-After；403 会冷却 5 倍时长。
+# 冷却中的账号会排到候选列表末尾，全部冷却时仍会尝试。范围 10-3600。
+cooldown_seconds = 120
+
+# 同时在途的聊天请求上限，整个账号池共用一个闸门；超出会排队等待。
+# 建议保持 1，避免打爆账号额度。范围 1-4。
+concurrency = 1
+
+# 每分钟真实上游请求上限（401 刷新后的重发、换号重试各算一次）。
+# 超出预算会排队等待窗口释放，不会直接报错；0 表示不限制。范围 0-600，默认 60。
+rpm = 60
+
+# 默认导入文件。留空表示使用插件数据目录下的 accounts-import.json，
+# 即 /MaiBot/data/plugins/local.workbuddy-pool/accounts-import.json
+# （宿主机为 <实例>/plugin-data/local.workbuddy-pool/accounts-import.json）。
+# 也可以写相对于数据目录的路径，或容器内可读的绝对路径。
+import_path = ""
+
+# 实验开关：把 X-Conversation-ID 固定为该账号的派生值，便于上游前缀缓存命中。
+# 默认关闭；开启后同一账号的请求共享会话 id，便于做单变量对照。
+stable_conversation_id = false
+
+
+[network]
+# 国内版聊天与 token 刷新网关。默认 copilot.tencent.com。
+# 若该域名在当前网络被拦截（连接重置/超时），可改成 https://www.codebuddy.cn
+# 或 https://www.workbuddy.cn —— 国内版这几个入口对同一凭据等价。
+cn_chat_base = "https://copilot.tencent.com"
+
+# 国际版网关默认值。账号 domain 为 codebuddy.ai 时会自动改用
+# https://www.codebuddy.ai，不需要在这里单独配置。
+global_chat_base = "https://www.workbuddy.ai"
+
+# 单次上游读取超时（秒）。长上下文的首字节可能较慢，不建议调得过小。范围 30-600。
+request_timeout = 180
+
+
+[catalog]
+# 是否抓取并缓存 WorkBuddy 模型目录（含倍率、上下文、图片/思考能力）。
+# 目录读取全是只读 GET，不消耗积分。
+enabled = true
+# 目录缓存有效期（秒）。过期后按需刷新；页面上的「刷新目录」会强制刷新。
+ttl_seconds = 900
+# 插件加载后是否自动刷新一次目录。
+refresh_on_start = true
+
+
+[models_server]
+# 本地 OpenAI 兼容 /v1/models 服务：MaiBot「获取AI模型」直接读它。
+# 只绑定回环地址，只提供 GET，不写任何状态。默认 http://127.0.0.1:8765/v1
+auto_start = true
+host = "127.0.0.1"
+# 端口被占用时改这里，并同步更新 model_config.toml 里 WorkBuddy 的 base_url。
+port = 8765
+
+
+[sync]
+# 模型同步写入的提供商名称，必须与 model_config.toml 的 [[api_providers]].name 一致。
+provider_name = "WorkBuddy"
+# model_config.toml 路径。留空时从插件数据目录向上推断，容器内通常是
+# /MaiBot/config/model_config.toml。
+model_config_path = ""

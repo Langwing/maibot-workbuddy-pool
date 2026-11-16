@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+accounts.enc
+accounts-import.json
+*.master_key
+catalog.json
+model_prefs.json
+identity.json
+backups/
+.pytest_cache/
+.DS_Store

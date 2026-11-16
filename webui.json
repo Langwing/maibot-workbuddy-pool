@@ -1,0 +1,110 @@
+{
+  "schema_version": 2,
+  "required_capabilities": ["custom_pages", "structured_arguments"],
+  "pages": [
+    {
+      "id": "pool",
+      "title": "WorkBuddy 账号池",
+      "description": "账号池、模型目录与倍率、图片/思考开关、积分总览、诊断、设备身份、批量测试与模型同步",
+      "mode": "custom",
+      "entry": "webui/index.html",
+      "layout": "document",
+      "placement": "sidebar",
+      "icon": "list",
+      "queries": {
+        "state": { "api": "wb_page_state" },
+        "login_status": { "api": "wb_page_login_status" },
+        "models": { "api": "wb_models_state" },
+        "credits": { "api": "wb_credits_state" },
+        "diagnose": { "api": "wb_diagnose" },
+        "identity": { "api": "wb_identity_state" },
+        "tests": { "api": "wb_test_status" }
+      },
+      "actions": {
+        "import": {
+          "api": "wb_page_import",
+          "parameters": {
+            "payload": { "type": "string", "max_length": 60000 },
+            "path": { "type": "string", "max_length": 500 }
+          }
+        },
+        "switch": {
+          "api": "wb_page_switch",
+          "parameters": {
+            "ref": { "type": "string", "required": true, "max_length": 100 }
+          }
+        },
+        "remove": {
+          "api": "wb_page_remove",
+          "parameters": {
+            "ref": { "type": "string", "required": true, "max_length": 100 }
+          },
+          "confirmation": "确定从账号池移除该账号吗？只删除本地凭据，不影响 WorkBuddy 账号本身。"
+        },
+        "login_begin": {
+          "api": "wb_page_login_begin",
+          "parameters": {}
+        },
+        "refresh_catalog": {
+          "api": "wb_catalog_refresh",
+          "parameters": {}
+        },
+        "fetch_credits": {
+          "api": "wb_fetch_credits",
+          "parameters": {
+            "ref": { "type": "string", "max_length": 100 }
+          }
+        },
+        "set_model_prefs": {
+          "api": "wb_set_model_prefs",
+          "parameters": {
+            "visual": { "type": "array", "items": { "type": "string" } },
+            "reasoning": { "type": "string", "max_length": 8000 }
+          }
+        },
+        "sync_apply": {
+          "api": "wb_sync_apply",
+          "parameters": {},
+          "confirmation": "将按目录对齐 model_config.toml 中 WorkBuddy 名下的模型（增/删/更新视觉），其他提供商不动，写前备份。确定继续吗？"
+        },
+        "identity_set": {
+          "api": "wb_identity_set",
+          "parameters": {
+            "ref": { "type": "string", "required": true, "max_length": 100 },
+            "machine_id": { "type": "string", "max_length": 64 },
+            "session_id": { "type": "string", "max_length": 64 }
+          }
+        },
+        "identity_reset": {
+          "api": "wb_identity_reset",
+          "parameters": {},
+          "confirmation": "将重新生成设备盐并清空所有账号的设备 id 覆盖值，之后每个账号的设备身份都会变化。确定继续吗？"
+        },
+        "account_toggle": {
+          "api": "wb_account_toggle",
+          "parameters": {
+            "ref": { "type": "string", "required": true, "max_length": 100 }
+          }
+        },
+        "account_refresh": {
+          "api": "wb_account_refresh",
+          "parameters": {
+            "ref": { "type": "string", "required": true, "max_length": 100 }
+          }
+        },
+        "start_test": {
+          "api": "wb_start_test",
+          "parameters": {
+            "model": { "type": "string", "required": true, "max_length": 120 }
+          }
+        },
+        "start_batch_test": {
+          "api": "wb_start_batch_test",
+          "parameters": {
+            "models": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    }
+  ]
+}
